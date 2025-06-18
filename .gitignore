@@ -1,0 +1,65 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# VSCode settings (optional)
+.vscode/
+
+# Environment variables and secrets
+.env
+*.env
+
+# Logs and output
+*.log
+*.out
+*.err
+
+# System files
+.DS_Store
+Thumbs.db
+
+# MyPy and Pyright type check files
+.mypy_cache/
+.pyright/
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+coverage.xml
+*.cover
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# FastAPI generated static
+staticfiles/
+media/
+
+# LangGraph cache (if any custom)
+.langchain/
+.langgraph/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS swap and temp files
+*.swp
+*.bak
+*.tmp
+
+# Compiled C files (if using C extensions)
+*.so
+
+# VS Code & JetBrains IDE configs (optional)
+.idea/
