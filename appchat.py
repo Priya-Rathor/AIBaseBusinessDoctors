@@ -130,3 +130,4 @@ async def generate_chat_responses(message: str, checkpoint_id: Optional[str] = N
 async def chat_stream(message: str, checkpoint_id: Optional[str] = Query(None)):
     logger.debug(f"Received message: {message}, checkpoint_id: {checkpoint_id}")
     return StreamingResponse(generate_chat_responses(message, checkpoint_id), media_type="text/event-stream")
+    

@@ -124,20 +124,28 @@ async def tool_node(state: State):
     tool_calls = state["messages"][-1].tool_calls
     tool_messages = []
     
+    # Keep the assistant message that contains the tool calls
+    assistant_message = state["messages"][-1]
+    tool_messages.append(assistant_message)
+    
     for tool_call in tool_calls:
         try:
             if tool_call["name"] == "tavily_search_results_json":
                 search_results = await search_tool.ainvoke(tool_call["args"])
-                # Return both raw and processed results
+                
+                # Create a special search results message
+                urls = [result["url"] for result in search_results if "url" in result]
+                search_results_message = {
+                    "type": "search_results",
+                    "search_results": urls
+                }
                 tool_message = ToolMessage(
-                    content=json.dumps({
-                        "raw_results": search_results,
-                        "processed_results": process_search_results(search_results)
-                    }),
+                    content=json.dumps(search_results_message),
                     tool_call_id=tool_call["id"],
                     name=tool_call["name"]
                 )
                 tool_messages.append(tool_message)
+                
         except Exception as e:
             logger.error(f"Tool execution failed: {str(e)}")
             tool_message = ToolMessage(
@@ -148,6 +156,7 @@ async def tool_node(state: State):
             tool_messages.append(tool_message)
     
     return {"messages": tool_messages}
+
 
 # Build the graph
 graph_builder = StateGraph(State)
@@ -173,6 +182,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def serialize_ai_message_chunk(chunk):
+    """Serialize AI message chunks for streaming."""
+    if isinstance(chunk, AIMessageChunk):
+        return chunk.content
+    raise TypeError(f"Object of type {type(chunk).__name__} is not correctly formatted for serialization")
 
 @app.get("/chat_stream")
 async def chat_stream(
@@ -219,7 +234,8 @@ async def chat_stream(
                         if event_type == "on_chat_model_stream":
                             if isinstance(event.get("data", {}).get("chunk"), AIMessageChunk):
                                 chunk = event["data"]["chunk"]
-                                yield f"data: {json.dumps({'type': 'content', 'content': chunk.content})}\n\n"
+                                content = serialize_ai_message_chunk(chunk)
+                                yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
 
                         elif event_type in ["on_chat_model_end", "on_llm_end", "on_chain_end"]:
                             output = event.get("data", {}).get("output", {})
@@ -241,16 +257,9 @@ async def chat_stream(
                                 if output:
                                     tool_content = json.loads(output)
                                     # First send processed search results
-                                    if "processed_results" in tool_content:
-                                        search_data = tool_content["processed_results"]
-                                        if search_data:
-                                            yield f"data: {json.dumps({'type': 'search_results', 'data': search_data})}\n\n"
-                                            logger.info(f"Search results sent: {search_data}")
-                                        else:
-                                            yield f"data: {json.dumps({'type': 'search_error', 'message': 'No valid search results found'})}\n\n"
-                                    # Then send raw results for LLM processing
-                                    if "raw_results" in tool_content:
-                                        yield f"data: {json.dumps({'type': 'content', 'content': tool_content['raw_results']})}\n\n"
+                                    if "type" in tool_content and tool_content["type"] == "search_results":
+                                         yield f"data: {json.dumps(tool_content)}\n\n"
+                                
                                 else:
                                     yield f"data: {json.dumps({'type': 'search_error', 'message': 'Empty search results'})}\n\n"
                             except Exception as e:
